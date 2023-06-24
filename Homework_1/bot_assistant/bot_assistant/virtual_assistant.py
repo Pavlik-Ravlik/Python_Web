@@ -2,10 +2,7 @@ from collections import UserList, UserDict
 from datetime import datetime, date
 from bot_assistant.my_utils import format_phone_number, sanitize_phone_number, get_date
 import re
-from abc import ABC, abstractmethod
 
-class BaseInterface(ABC):
-    pass
 """
 
 """
@@ -304,7 +301,7 @@ class Record:
 
 ##########################################################################################
 
-class AddressBook(UserDict, BaseInterface):
+class AddressBook(UserDict):
     """Contact book"""
 
     def record_exists(self, rec_name, is_raise=None):

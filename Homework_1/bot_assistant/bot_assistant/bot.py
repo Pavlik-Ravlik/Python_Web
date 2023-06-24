@@ -11,13 +11,39 @@ from bot_assistant.sorter import Sorter
 from bot_assistant.bot_help import Bot_help
 from bot_assistant.bot_setting import Bot_setting
 from bot_assistant.my_utils import split
+from abc import ABC, abstractclassmethod
 
 module_directory = os.path.dirname(os.path.abspath(sys.modules[__name__].__file__))
 
 
+class BaseUserInterface(ABC):
+    
+    @abstractclassmethod
+    def display_message(self, message):
+        raise NotImplementedError
+
+    @abstractclassmethod
+    def get_user_input(self, prompt):
+        raise NotImplementedError
+
+    @abstractclassmethod
+    def clear_screen(self):
+        raise NotImplementedError
+
+
+class ConsoleUserInterface(BaseUserInterface):
+    def display_message(self, message):
+        print(message)
+
+    def get_user_input(self, prompt):
+        return prompt
+
+    def clear_screen(self):
+        os.system('clear')
+
 class Bot_assistant:
 
-    def __init__(self) -> None:
+    def __init__(self, user_interface) -> None:
         self.interactive_mode = 0
         self.addressbook = None  # адресная книга
         self.notebook = None  # книга заметок
@@ -28,6 +54,7 @@ class Bot_assistant:
         self.cur_name = None
         self.cur_phone = None
         self.cur_email = None
+        self.user_interface = user_interface
 
         # self.setting_key = None
 
@@ -557,15 +584,16 @@ class Bot_assistant:
         while True:
             res = self.parcer(command)
             if res is not None:
-                print(res)
+                ConsoleUserInterface.display_message(res)
             if self.interactive_mode == 0:
                 break
-            cmd = input('>> ')
+            cmd = ConsoleUserInterface.get_user_input('>> ')
             command = split(cmd)
-            #clear_screen()
+            #ConsoleUserInterface.clear_screen()
         self.save_classes()
 
 
 if __name__ == "__main__":
-    ba = Bot_assistant()
+    console = ConsoleUserInterface()
+    ba = Bot_assistant(console)
     ba.main()
