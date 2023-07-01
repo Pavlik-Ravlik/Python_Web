@@ -11,7 +11,7 @@ WORKDIR /app
 COPY . /app
 
 # Встановлюємо залежності за допомогою Pipenv
-RUN pipenv sync
+RUN pipenv install --system --deploy
 
 # Запускаємо "Персональний помічник"
 CMD ["pipenv", "run", "python", "homework_2/bot_assistant/bot_assistant/run.py"]
