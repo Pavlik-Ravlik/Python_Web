@@ -1,5 +1,6 @@
 import os
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 main_path = 'C:\\Users\PC\Desktop\Хлам'
 
@@ -35,10 +36,10 @@ def create_folders_from_list(folder_path: str, folder_names: dict):
 
 # Получили список путів файлів
 def get_file_path(folder_path: str) -> list:
-    spisok = []
+    list_file_path = []
     for i in os.listdir(folder_path):
-        spisok.append(os.path.join(folder_path, i))
-    return spisok
+        list_file_path.append(os.path.join(folder_path, i))
+    return list_file_path
 
 
 # Сортуємо файли по папкам
@@ -101,15 +102,23 @@ def remove_empty_folders(folder_path_list: list):
         if not os.listdir(char):
             os.removedirs(char)
 
+
+def process_folder(folder_path):
+    remove_empty_folders(folder_path)
+
 def run():
     parse_folders(main_path)
     create_folders_from_list(main_path, EXTENSIONS)
-    get_file_path(main_path)
     sort_files(main_path)
     create_folder_from_archive(main_path)
     unpuck_archives(main_path)
-    remove_empty_folders(main_path)
-    print('Папка сортована.!!!!!')
+    folder_paths = get_folders_path(main_path)
+
+    with ThreadPoolExecutor() as executor:
+        executor.map(process_folder, folder_paths)
+
+    print('Обработка папок завершена.')
 
 if __name__ == '__main__':
     run()
+
