@@ -30,7 +30,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.send_static()
             
             else:
-                self.send_html_file('error.html', 404)
+                self.send_html_file('error.html', status=404)
 
 
     def do_POST(self):
@@ -38,14 +38,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         date = datetime.now()
         
         data = self.rfile.read(int(self.headers['Content-Length']))
-        print(data)
-
         data_parse = urllib.parse.unquote_plus(data.decode())
-        print(data_parse)
-        
         data_dict = {username: message for username, message in [
             el.split('=') for el in data_parse.split('&')]}
-        print(data_dict)
 
         data_dict_date = {str(date): data_dict}
 
@@ -55,7 +50,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                     existing_data = json.load(file)
                 data_dict_date.update(existing_data)
         except json.decoder.JSONDecodeError:
-            # Handle empty or invalid JSON file
             existing_data = {}
 
         with open(filename, 'w') as file:
