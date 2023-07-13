@@ -1,0 +1,265 @@
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Вспомогательная функция asyncio.gather нужна, чтобы положить в очередь несколько сопрограмм и позволить Event loop выполнять их в любом порядке.=====
+
+=====Кроме того, asyncio.gather возвращает результат выполнения coroutine в том же порядке, в котором они были вызваны.=====
+    
+    async def main():
+        r = []
+        for i in range(1, 4):
+            r.append(get_user_async(i))
+        return await asyncio.gather(*r)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Обычно работать с низкоуровневыми примитивами asyncio не нужно и не рекомендуется. Но если возникает необходимость, 
+то можно отправить задачу в текущий Event loop при помощи функции create_task, которая возвращает объект Task.=====
+
+    import asyncio
+    import random
+
+    async def random_value():
+        print("start task")
+        await asyncio.sleep(1)
+        print("task finished")
+        return random.random()
+
+    async def main():
+        task = asyncio.create_task(random_value())
+        print("task scheduled")
+        await task
+        print(f"result: {task.result()}")
+
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Поскольку далеко не все IO операции во всех пакетах реализуют async/await синтаксис, то часто бывает надо выполнить в асинхронном коде блокирующий IO вызов из пакета, 
+где нет async/await аналога.=====
+
+=====Для этого можно воспользоваться уже известным вам пакетом concurrent.futures и методом run_in_executor объекта loop (это и есть Event loop).=====
+
+=====Сам процесс перевода синхронного кода в асинхронный достаточно прост. Мы оборачиваем функцию blocks функцией run_blocking_tasks.=====
+
+=====Внутри нее берем отдельный loop = asyncio.get_event_loop() и через вызов run_in_executor получаем асинхронный результат функции blocks.
+В качестве Executor у нас выступает concurrent.futures.ThreadPoolExecutor=====
+
+    import asyncio
+    import concurrent.futures
+    from time import time
+
+    def blocks(n):
+        counter = n
+        start = time()
+        while counter > 0:
+            counter -= 1
+        return time() - start
+
+    async def monitoring():
+        while True:
+            await asyncio.sleep(2)
+            print(f'Monitoring {time()}')
+
+    async def run_blocking_tasks(executor, n):
+        loop = asyncio.get_event_loop()
+        print('waiting for executor tasks')
+        result = await loop.run_in_executor(executor, blocks, n)
+        return result
+
+    async def main():
+        asyncio.create_task(monitoring())
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [run_blocking_tasks(executor, n) for n in [50_000_000, 60_000_000, 70_000_000]]
+            results = await asyncio.gather(*futures)
+            return results
+
+    if __name__ == '__main__':
+        result = asyncio.run(main())
+        for r in result:
+            print(r)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Так же, можно перевести на параллельное выполнение сетевые запросы requests:=====
+
+=====Мы делаем функцию обертку preview_fetch_async над функцией preview_fetch. Внутри берем текущий выполняемый Event loop loop = asyncio.get_running_loop() и с помощью 
+ThreadPoolExecutor помещаем функцию preview_fetch в Executor - [loop.run_in_executor(pool, preview_fetch, url) for url in urls]. Полученный список объектов Futures 
+передаем в asyncio.gather(*futures) для получения окончательного результата.=====
+
+=====Параметр return_exceptions отвечает за обработку ошибок, по умолчанию установлено значение False. Первое сгенерированное исключение 
+немедленно распространяется на задачу, ожидающую в gather. Если return_exceptions имеет значение True, исключения обрабатываются так же, как и успешные результаты, 
+и объединяются в списке результатов.=====
+
+    import asyncio
+    import requests
+    from concurrent.futures import ThreadPoolExecutor
+    from time import time
+
+    urls = ['http://www.google.com', 'http://www.python.org', 'http://duckduckgo.com']
+
+    def preview_fetch(url):
+        r = requests.get(url)
+        return url, r.text[:150]
+
+    async def preview_fetch_async():
+        loop = asyncio.get_running_loop()
+
+        with ThreadPoolExecutor(3) as pool:
+            futures = [loop.run_in_executor(pool, preview_fetch, url) for url in urls]
+            result = await asyncio.gather(*futures, return_exceptions=True)
+            return result
+
+    if __name__ == '__main__':
+        start = time()
+        r = asyncio.run(preview_fetch_async())
+        print(r)
+        print(time() - start)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Пакет AIOFILE
+Для асинхронной работы с файлами существует ряд пакетов. И начнем мы с aiofile. Он выполняет асинхронные операции при поддержке пакета asyncio.
+Вместо привычной функции open, необходимо использовать async_open. Он возвращает файлоподобные объекты python с асинхронными методами.=====
+
+=Поддерживаемые методы:
+    async def read(length = -1) - чтение фрагмента из файла, при длине -1 файл будет прочитан до конца.
+    async def write(data) - записать фрагмент в файл
+    def seek(offset) - установить позицию указателя файла
+    def tell() - возвращает текущую позицию указателя файла
+    async def readline(size=-1, newline="\n") - читать фрагменты до новой строки или EOF.
+    def __aiter__() -> LineReader - итератор по строкам.
+    def iter_chunked(chunk_size: int = 32768) -> Reader — итератор по чанкам.=
+
+=====Подход await afp.read()=====
+    import asyncio
+    from aiofile import async_open
+
+    async def main():
+        async with async_open("hello.txt", 'r') as afp:
+            print(await afp.read())
+
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+
+=====Подход async for=====
+    import asyncio
+    from aiofile import async_open
+
+    async def main():
+        async with async_open("hello.txt", 'r') as afp:
+            async for line in afp:
+                print(line)
+
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+
+=====LineReader — помощник, который очень эффективен, когда вы хотите прочитать файл линейно и построчно. Он содержит буфер и будет считывать фрагменты 
+файла по частям в буфер, где будет пытаться найти строки. Размер фрагмента по умолчанию составляет 4 КБ.=====
+
+    import asyncio
+    from aiofile import AIOFile, LineReader
+
+    async def main():
+        async with AIOFile("hello.txt", 'r') as afp:
+            async for line in LineReader(afp):
+                print(line)
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Пакет AIOPATH
+Если вы пишете асинхронный код Python и хотите воспользоваться преимуществами pathlib, но не хотите смешивать блокирующий и неблокирующий ввод-вывод, 
+вы можете обратиться к aiopath . API aiopath прямо совпадает с API pathlib, но все необходимые методы асинхронны.
+Например, проверим существует ли файл "hello.txt" в текущей папке:=====
+
+    import asyncio
+    from aiopath import AsyncPath
+
+    async def main():
+        apath = AsyncPath("hello.txt")
+        print(await apath.exists())
+        print(await apath.is_file())
+        print(await apath.is_dir())
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====Пакет AIOSHUTIL
+Библиотека aioshutil предоставляет асинхронную версию функции модуля Shutil. Модуль Shutil является синхронным, и его использование в асинхронных приложениях 
+заблокирует цикл событий и замедлит работу приложения, aioshutil предоставляет асинхронные дружественные версии функций модуля Shutil.
+Для примера давайте мы создадим папку logs и скопируем туда наш файл "hello.txt"=====
+
+    import asyncio
+    from aiopath import AsyncPath
+    from aioshutil import copyfile
+
+    async def main():
+        apath = AsyncPath("hello.txt")
+        if await apath.exists():
+            new_path = AsyncPath('logs')
+            await new_path.mkdir(exist_ok=True, parents=True)
+            await copyfile(apath, new_path / apath)
+
+    if __name__ == '__main__':
+        asyncio.run(main())
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                            Aiohttp клиент для асинхронных HTTP запросов                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+=====AIOHTTP — это асинхронный фреймворк, в котором реализован web-стек на основе asyncio в Python. В AIOHTTP реализованы клиентская часть и серверная часть. 
+Реализация HTTP и сам веб-сервер не используют дополнительных внешних библиотек. Встроенный веб-сервер реализован на уровне, достаточном для использования в реальных нагруженных проектах.=====
+
+=====Выполнение запроса
+Клиентская часть AIOHTTP сосредоточена на повышении производительности и использовании asyncio. Пример асинхронного запроса на адрес https://python.org:=====
+
+    import platform
+    import aiohttp
+    import asyncio
+
+    async def main():
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://python.org') as response:
+                print("Status:", response.status)
+                print("Content-type:", response.headers['content-type'])
+                html = await response.text()
+                print("Body:", html[:15], "...")
+
+    if __name__ == "__main__":
+        if platform.system() == 'Windows':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.run(main())
+
+=====AIOHTTP сфокусирован на повышении производительности, потому обойти этап создания сессий нельзя. Непосредственно запрос к серверу происходит в контексте сессии, 
+для этого у объекта класса ClientSession (session в нашем примере) есть методы get, post, put и другие.=====
+
+==Эти методы получают обязательный аргумент, адрес сервера и ряд именованных аргументов, которые зависят от запроса:
+    data — byte объект с телом запроса;
+    params — словарь с набором параметров запроса;
+    json — Python объект, который будет преобразован в JSON и отправлен серверу в теле запроса;
+    headers — словарь, значения которого будут добавлены в заголовок запроса;
+    cookies — словарь с полями для куки.==
+
+==Следующий фрагмент кода, в примере:
+    if platform.system() == 'Windows':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+мы используем, чтобы избежать ошибки RuntimeError: Event loop is closed в системе Windows==
+
+==Получив ответ (response в примере), сразу доступны аттрибуты заголовка ответа:
+    status — HTTP статус код ответа сервера;
+    headers — словарь с полями заголовка;
+    cookies — набор http cookies если они были переданы;
+    ok — специальное поле типа bool, которое имеет значение True, если запрос был успешным, то есть его статус менее 400;==
+    
+==Обработав заголовок ответа, можно получить тело запроса, используя один из асинхронных методов:
+    read — возвращает тело ответа в bytes;
+    text — строка из тела запроса, если заголовок Content-type равен text/plain;
+    json — автоматически декодирует JSON объект из тела запроса в Python объект;
+    В примере мы обработали response методом json и значение result это список словарей==
+
+
+
+
+
+
+
+
+
+
+

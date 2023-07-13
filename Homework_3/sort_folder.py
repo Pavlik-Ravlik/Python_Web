@@ -2,7 +2,7 @@ import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 
-main_path = 'C:\\Users\PC\Desktop\Хлам'
+main_path = 'C:\\Users\PC\Downloads'
 
 EXTENSIONS = {
     "video": ["mp4", "mov", "avi", "mkv"],
