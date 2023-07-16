@@ -1,12 +1,23 @@
 import asyncio
 import logging
+
+import aiohttp
 import websockets
 import names
 from websockets import WebSocketServerProtocol
 from websockets.exceptions import ConnectionClosedOK
-from main_py import get_currency_rates, get_exchange_rates
+
 
 logging.basicConfig(level=logging.INFO)
+
+
+async def get_exchange():
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://api.privatbank.ua/p24api/pubinfo?json&exchange&coursid=5') as resp:
+            if resp.status == 200:
+                r = await resp.json()
+                exc, = list(filter(lambda el: el['ccy'] == 'USD', r))
+            return f'USD: buy: {exc["buy"]}, sale: {exc["sale"]}'
 
 
 class Server:
@@ -43,20 +54,10 @@ class Server:
 
     async def distrubute(self, ws: WebSocketServerProtocol):
         async for message in ws:
+            
             if message == 'exchange':
-                rates = get_currency_rates(1, '')
-                formatted_rates = ""
-                
-                for rate in rates:
-                    
-                    for date, currencies in rate.items():
-                        formatted_rates += f"{date}:\n"
-                        
-                        for currency, values in currencies.items():
-                            formatted_rates += f"  {currency}:\n"
-                            formatted_rates += f"    Sale: {values['sale']}\n"
-                            formatted_rates += f"    Purchase: {values['purchase']}\n"
-                await self.send_to_clients(f"{ws.name}:\n{formatted_rates}")
+                message = await get_exchange()
+                await self.send_to_clients(f"{message}")
             
             else:
                 await self.send_to_clients(f"{ws.name}: {message}")
