@@ -9,6 +9,8 @@ packages = [{include = "homework_7"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 sqlalchemy = "^2.0.19"
+alembic = "^1.11.1"
+faker = "^19.2.0"
 
 
 [build-system]

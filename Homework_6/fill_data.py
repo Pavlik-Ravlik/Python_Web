@@ -25,7 +25,7 @@ def main():
             teacher_id = random.randint(1, 5)  # Выбираем случайного преподавателя
             cursor.execute("INSERT INTO subjects (name, teacher_id) VALUES (?, ?)", (subject, teacher_id))
 
-        # Заполнение таблицы студентов и оценок
+        # Заполнение таблицы студентов
         for _ in range(50):
             name = fake.name()
             group_id = random.randint(1, 3)  # Выбираем случайную группу для студента
