@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "homework-9"
+version = "0.1.0"
+description = ""
+authors = ["Pavlik-Ravlik <pastet1990@icloud.com>"]
+readme = "README.md"
+packages = [{include = "homework_9"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.31.0"
+lxml = "^4.9.3"
+beautifulsoup4 = "^4.12.2"
+scrapy = "^2.10.0"
+pymongo = "^4.4.1"
+mongoengine = "^0.27.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
