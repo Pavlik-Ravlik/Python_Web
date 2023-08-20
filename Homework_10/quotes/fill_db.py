@@ -1,7 +1,6 @@
 import os
 import django
 import json
-from django.utils.dateparse import parse_datetime
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "quotes.settings")
 django.setup()
@@ -15,7 +14,7 @@ def read_authors():
     return load_data
 
 def read_quotes():
-    with open('quotes,json', 'r') as file:
+    with open('quotes.json', 'r') as file:
         load_data = json.load(file)
     
     return load_data
@@ -41,7 +40,6 @@ for quote_data in quotes_data:
     Quote.objects.get_or_create(
         quote=quote_data["quote"],
         author=author,
-        created_at=parse_datetime(quote_data.get("created_at")),
     )
 
     quote = Quote.objects.get(quote=quote_data["quote"])
