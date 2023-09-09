@@ -1,18 +1,19 @@
 [tool.poetry]
-name = "homework-11"
+name = "fast-api"
 version = "0.1.0"
 description = ""
 authors = ["Pavlik-Ravlik <pastet1990@icloud.com>"]
 readme = "README.md"
-packages = [{include = "homework_11"}]
+packages = [{include = "fast_api"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.102.0"
-uvicorn = {extras = ["standard"], version = "^0.23.2"}
+fastapi = "^0.103.0"
 sqlalchemy = "^2.0.20"
 psycopg2 = "^2.9.7"
 alembic = "^1.11.3"
+pydantic = {extras = ["email"], version = "^2.3.0"}
+uvicorn = {extras = ["standard"], version = "^0.23.2"}
 
 
 [build-system]
